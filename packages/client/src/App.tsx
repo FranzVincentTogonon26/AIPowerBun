@@ -10,7 +10,7 @@ function App() {
       .then( data => setMessage(data.message) )
   }, [])
 
-  return <div>{message}</div>
+  return <div className='text-3xl'>{message}</div>
 
 }
 
