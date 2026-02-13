@@ -15,14 +15,25 @@ const AI = new GoogleGenAI({
 // Middleware handler for json()
 app.use(express.json());
 
+const conversations = new Map<string, string[]>();
+
 app.post('/api/chat', async (req: Request, res: Response) => {
-   const { prompt } = req.body;
-   const trimmedPrompt = prompt.substring(0, 15000);
+   const { prompt, conversationId } = req.body;
+
+   const history = conversations.get(conversationId) ?? [];
+
+   history.push(`User: ${prompt}`);
 
    const response = await AI.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: trimmedPrompt,
+      contents: history.join('\n'),
    });
+
+   const text = response.text ?? '';
+
+   history.push(`Assistant: ${text}`);
+
+   conversations.set(conversationId, history);
 
    res.json({
       message: response.text,
