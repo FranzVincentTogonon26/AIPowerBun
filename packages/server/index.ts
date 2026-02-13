@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import express from 'express';
+import z from 'zod';
 import { GoogleGenAI } from '@google/genai';
 import type { Request, Response } from 'express';
 
@@ -12,32 +13,53 @@ const AI = new GoogleGenAI({
    apiKey: process.env.GEMINI_API_KEY,
 });
 
-// Middleware handler for json()
 app.use(express.json());
 
 const conversations = new Map<string, string[]>();
 
+const chatSchema = z.object({
+   prompt: z
+      .string()
+      .trim()
+      .min(1, 'Prompt is required. ')
+      .max(1000, 'Promt is too long ( Max 1000 characters ).'),
+   conversationId: z.string().uuid(),
+});
+
 app.post('/api/chat', async (req: Request, res: Response) => {
-   const { prompt, conversationId } = req.body;
+   const parseResult = chatSchema.safeParse(req.body);
 
-   const history = conversations.get(conversationId) ?? [];
+   if (!parseResult.success) {
+      res.status(400).json({
+         message: parseResult.error.format(),
+      });
+      return;
+   }
 
-   history.push(`User: ${prompt}`);
+   try {
+      const { prompt, conversationId } = req.body;
+      const history = conversations.get(conversationId) ?? [];
 
-   const response = await AI.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: history.join('\n'),
-   });
+      history.push(`User: ${prompt}`);
 
-   const text = response.text ?? '';
+      const response = await AI.models.generateContent({
+         model: 'gemini-3-flash-preview',
+         contents: history.join('\n'),
+      });
 
-   history.push(`Assistant: ${text}`);
+      const text = response.text ?? '';
 
-   conversations.set(conversationId, history);
+      history.push(`Assistant: ${text}`);
+      conversations.set(conversationId, history);
 
-   res.json({
-      message: response.text,
-   });
+      res.status(200).json({
+         message: response.text,
+      });
+   } catch (error) {
+      res.status(500).json({
+         message: 'Failed to generate a response',
+      });
+   }
 });
 
 app.listen(port, () => {
