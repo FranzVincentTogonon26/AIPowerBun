@@ -3,6 +3,7 @@ import express from 'express';
 import z from 'zod';
 import { GoogleGenAI } from '@google/genai';
 import type { Request, Response } from 'express';
+import { conversationRepository } from './repositories/conversation.repository';
 
 dotenv.config();
 
@@ -15,7 +16,7 @@ const AI = new GoogleGenAI({
 
 app.use(express.json());
 
-const conversations = new Map<string, string[]>();
+// const conversations = new Map<string, string[]>();
 
 const chatSchema = z.object({
    prompt: z
@@ -38,7 +39,8 @@ app.post('/api/chat', async (req: Request, res: Response) => {
 
    try {
       const { prompt, conversationId } = req.body;
-      const history = conversations.get(conversationId) ?? [];
+      // const history = conversations.get(conversationId) ?? [];
+      const history = conversationRepository.getLastResponseId(conversationId);
 
       history.push(`User: ${prompt}`);
 
@@ -50,7 +52,8 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       const text = response.text ?? '';
 
       history.push(`Assistant: ${text}`);
-      conversations.set(conversationId, history);
+      // conversations.set(conversationId, history);
+      conversationRepository.setLastResponseId(conversationId, history);
 
       res.status(200).json({
          message: response.text,
